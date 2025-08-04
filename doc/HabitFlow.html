@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitFlow</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='50%' style='font-size: 90px;' text-anchor='middle' dominant-baseline='middle'>🏃‍♂️‍➡️</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            500: '#3B82F6',
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .habit-card:hover {
+            transform: translateY(-2px);
+            transition: transform 0.2s ease;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .truncate-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .break-word {
+            overflow-wrap: break-word;
+            word-wrap: break-word; /* Fallback para navegadores mais antigos */
+            word-break: break-word;
+        }
+        .is-today {
+            box-shadow: 0 0 0 2px #3B82F6; /* Anel azul para o dia atual */
+        }
+        #habitsListContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+        #habitsListContainer::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #habitsListContainer::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        #habitsListContainer::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        .actions-dropdown {
+            background: rgba(30, 41, 59, 0.8); /* bg-slate-800 com transparência */
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 0.25rem; /* 4px */
+            z-index: 50;
+        }
+
+        /* NOVO: Estilos para a Sidebar Retrátil */
+        #app-container {
+            display: flex;
+            width: 100%;
+        }
+
+        #sidebar {
+            flex-shrink: 0; /* Impede que a sidebar encolha além do definido */
+            width: 16rem; /* 256px */
+            transform: translateX(0);
+            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+            overflow: hidden; /* Garante que o conteúdo não vaze durante a animação */
+        }
+
+        #main-content {
+            flex-grow: 1;
+            transition: margin-left 0.3s ease-in-out;
+            position: relative; /* Necessário para posicionar o botão externo */
+        }
+
+		#sidebar-toggle-external {
+			position: absolute;
+			top: 1.5rem; /* MUDANÇA AQUI: 24px */
+			left: 1.5rem; /* 24px */
+			z-index: 40;
+			display: none; /* Começa oculto */
+		}
+		
+		/* NOVO: Regras para corrigir o espaçamento do conteúdo principal */
+		#main-content {
+			padding: 1.5rem; /* 24px - Equivalente ao p-6 que removemos */
+			transition: padding-top 0.3s ease-in-out; /* Anima a mudança de padding */
+		}
+
+		#app-container.sidebar-collapsed #main-content {
+			/* Aumenta o padding do topo quando a sidebar está recolhida para dar espaço ao botão */
+			padding-top: 4rem; /* 64px */
+		}
+
+        /* Estado Recolhido */
+        #app-container.sidebar-collapsed #sidebar {
+            width: 0;
+            transform: translateX(-100%);
+        }
+        
+        #app-container.sidebar-collapsed #main-content {
+            margin-left: 0;
+        }
+
+        #app-container.sidebar-collapsed #sidebar-toggle-external {
+            display: flex; /* Mostra o botão externo quando recolhido */
+        }
+        
+        /* Ajuste do Modal Maximizado quando a sidebar estiver recolhida */
+        /* REMOVIDO: Esta regra não funciona porque o modal está fora do app-container */
+        /*
+        #app-container.sidebar-collapsed .modal-maximized {
+            left: 0 !important;
+        }
+        
+        body #app-container.sidebar-collapsed .modal-maximized {
+            left: 0 !important;
+        }
+        
+        html body #app-container.sidebar-collapsed .modal-maximized {
+            left: 0 !important;
+        }
+        */
+        
+        .modal-maximized {
+            position: fixed !important;
+            top: 0 !important;
+            bottom: 0 !important;
+            left: 16rem !important; /* Largura exata da sidebar */
+            right: 0 !important;
+            width: auto !important;
+            height: 100vh !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 51 !important;
+            transform: none !important;
+            transition: left 0.3s ease-in-out; /* Animação suave para o modal */
+        }
+        .modal-maximized .modal-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 1.5rem;
+            overflow: hidden;
+        }
+        .modal-maximized #modalInput {
+            flex: 1 1 auto;
+            min-height: 0;
+            resize: none;
+        }
+        .modal-maximized #modalMaximizeBtn {
+            position: absolute !important;
+            right: 1.5rem !important;
+            top: 1.5rem !important;
+            z-index: 52 !important;
+        }
+        
+        /* NOVO: Responsividade para telas menores */
+        @media (max-width: 768px) {
+            #app-container:not(.sidebar-collapsed) #sidebar {
+                /* Quando expandido em telas pequenas, ele sobrepõe o conteúdo */
+                position: absolute;
+                z-index: 45;
+                height: 100vh;
+            }
+            #app-container #sidebar-toggle-external {
+                display: flex; /* Sempre mostra o botão externo */
+            }
+            #app-container.sidebar-collapsed #sidebar-toggle-external {
+                display: flex;
+            }
+            #app-container:not(.sidebar-collapsed) #sidebar-toggle-external {
+                 display: none; /* Oculta o botão externo quando a sidebar está aberta */
+            }
+        }
+
+        /* INÍCIO DA ALTERAÇÃO: Estilos para o Título do Cabeçalho Principal */
+        #app-container.sidebar-collapsed #mainHeaderTitle {
+            display: block; /* Torna o título visível */
+            position: absolute;
+            top: 1.5rem;  /* 24px - Alinha verticalmente com o botão de menu */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 30; /* Garante que fique abaixo do botão, se houver sobreposição */
+            pointer-events: none; /* Impede que o título intercepte cliques do mouse */
+        }
+        /* FIM DA ALTERAÇÃO */
+
+        /* NOVO: Garante que o overlay NUNCA apareça em telas de desktop */
+        @media (min-width: 769px) {
+            #sidebar-overlay {
+                display: none !important;
+            }
+        }
+
+        /* NOVO: Ajuste inteligente do modal maximizado com base no estado do body */
+        body.sidebar-is-collapsed .modal-maximized {
+            left: 0 !important;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div id="app-container">
+        <aside id="sidebar" class="glassmorphism border-r border-white/10 flex flex-col h-screen sticky top-0">
+            <div class="flex items-center justify-between p-4">
+                <div class="flex-grow">
+                     <h1 class="text-2xl font-bold tracking-wide cursor-pointer" id="logoTitle">HabitFlow</h1>
+                     <p class="text-sm text-white/60">Seu companheiro de hábitos</p>
+                </div>
+                <button id="sidebar-toggle-internal" class="p-2 rounded-full hover:bg-white/10 transition" title="Recolher menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="mb-4">
+                <ul class="space-y-2 px-4">
+                    <li>
+                        <a href="#" class="flex items-center p-2 rounded-lg hover:bg-white/10 transition" id="dashboardLink">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center p-2 rounded-lg hover:bg-white/10 transition" id="notesLink">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Anotações Gerais
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="flex-1 flex flex-col min-h-0 pt-4 border-t border-white/10">
+                <div class="mb-2 px-4">
+                    <h3 class="text-sm font-semibold text-white/70">MEUS HÁBITOS</h3>
+                </div>
+                
+                <div class="px-4 pb-2">
+                    <form id="newHabitForm" class="space-y-2">
+                        <input type="text" id="habitName" placeholder="Novo hábito..." class="w-full bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-full py-2 px-4 transition text-sm">Adicionar Hábito</button>
+                    </form>
+                </div>
+
+                <div class="flex-1 flex flex-col min-h-0 px-4 mt-2 pt-2">
+                    <div id="habitsListContainer" class="flex-1 overflow-y-auto pr-2">
+                        <div id="sidebarHabitsList" class="space-y-1">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-auto pt-4 border-t border-white/10 px-4 pb-4">
+                <a href="#" id="settingsLink" class="flex items-center p-2 rounded-lg hover:bg-white/10 transition text-white/70">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Configurações
+                </a>
+            </div>
+        </aside>
+
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+
+        <main id="main-content" class="flex-1 overflow-y-auto h-screen">
+             <button id="sidebar-toggle-external" class="p-2 rounded-full hover:bg-white/10 transition" title="Mostrar menu">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            
+            <h1 id="mainHeaderTitle" class="hidden text-2xl font-bold tracking-wide">HabitFlow</h1>
+            <div id="dashboardView" class="fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold">Meus Hábitos</h2>
+                    <button id="toggleNotesFeedBtn" class="p-2 rounded-full hover:bg-white/10 transition" title="Mostrar/Ocultar Feed de Anotações">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="habitsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                </div>
+                <div id="notesFeedContainer" class="hidden mt-8">
+                    <h2 class="text-xl font-semibold mb-4">Feed de Anotações</h2>
+                    <div id="notesFeedContent" class="space-y-4">
+                    </div>
+                </div>
+            </div>
+
+            <div id="habitDetailView" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center">
+                        <button id="backToDashboard" class="mr-4 p-2 rounded-full hover:bg-white/10 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
+                        <h2 id="habitDetailTitle" class="text-xl font-semibold flex items-center">
+                            <span id="habitNameTitle"></span>
+                            <button id="editHabitName" class="ml-2 p-1 rounded-full hover:bg-white/10 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </h2>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div id="habitDetailStreakCounter" class="streak-counter bg-white/10 text-lg font-mono px-4 py-2 rounded-full">
+                            ---
+                        </div>
+                        <button id="deleteHabitBtn" class="p-2 rounded-full hover:bg-red-500/20 transition text-red-400" title="Excluir Hábito">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                    </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2">
+                        <div class="glassmorphism border border-white/10 rounded-2xl p-4 mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <div class="flex items-center space-x-2">
+                                    <button id="prevCalendarBtn" class="p-2 rounded-full hover:bg-white/10 transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                                    </button>
+                                    <h3 id="calendarTitle" class="font-medium text-lg w-36 text-center"></h3>
+                                    <button id="nextCalendarBtn" class="p-2 rounded-full hover:bg-white/10 transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button id="monthViewBtn" class="text-sm bg-blue-500 px-3 py-1 rounded-full">Mês</button>
+                                    <button id="yearViewBtn" class="text-sm bg-white/5 px-3 py-1 rounded-full hover:bg-white/10 transition">Ano</button>
+                                </div>
+                            </div>
+
+                            <div id="monthCalendar" class="fade-in">
+                                <div class="grid grid-cols-7 gap-1 mb-2">
+                                    <div class="text-center text-sm text-white/60">Dom</div>
+                                    <div class="text-center text-sm text-white/60">Seg</div>
+                                    <div class="text-center text-sm text-white/60">Ter</div>
+                                    <div class="text-center text-sm text-white/60">Qua</div>
+                                    <div class="text-center text-sm text-white/60">Qui</div>
+                                    <div class="text-center text-sm text-white/60">Sex</div>
+                                    <div class="text-center text-sm text-white/60">Sáb</div>
+                                </div>
+                                <div id="monthDays" class="grid grid-cols-7 gap-1">
+                                    </div>
+                            </div>
+
+                            <div id="yearCalendar" class="hidden fade-in">
+                                <div class="grid grid-cols-4 gap-2">
+                                    </div>
+                            </div>
+                        </div>
+
+                        <div class="glassmorphism border border-white/10 rounded-2xl p-4">
+                            <h3 class="font-medium mb-4">Logs Recentes</h3>
+                            <div id="recentLogs" class="space-y-2">
+                                <p class="text-sm text-white/40 text-center py-4">Nenhum registro encontrado</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <div class="glassmorphism border border-white/10 rounded-2xl p-4 h-full flex flex-col">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-medium">Anotações do Hábito</h3>
+                                <button id="addNoteBtn" class="text-sm bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-full transition">+ Nova</button>
+                            </div>
+                            <div id="habitNotes" class="space-y-3 flex-1 overflow-y-auto">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="generalNotesView" class="hidden fade-in">
+                <div class="flex items-center mb-6">
+                    <button id="backFromNotes" class="mr-4 p-2 rounded-full hover:bg-white/10 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
+                    <h2 class="text-xl font-semibold">Anotações Gerais</h2>
+                </div>
+
+                <div class="glassmorphism border border-white/10 rounded-2xl p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-medium">Todas as Anotações</h3>
+                        <button id="addGeneralNoteBtn" class="text-sm bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-full transition">+ Nova</button>
+                    </div>
+                    <div id="generalNotesList" class="space-y-3">
+                        <p class="text-sm text-white/40 text-center py-4">Nenhuma anotação encontrada</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="settingsView" class="hidden fade-in">
+                <div class="flex items-center mb-6">
+                    <button id="backFromSettings" class="mr-4 p-2 rounded-full hover:bg-white/10 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
+                    <h2 class="text-xl font-semibold">Configurações</h2>
+                </div>
+                <div class="glassmorphism border border-white/10 rounded-2xl p-6 max-w-2xl mx-auto">
+                    <h3 class="font-medium text-lg mb-4">Gerenciamento de Dados</h3>
+                    <p class="text-sm text-white/60 mb-6">Exporte seus dados para um arquivo seguro ou restaure-os a qualquer momento.</p>
+                    <div class="space-y-3">
+                        <button id="backupBtn" class="w-full text-left flex items-center bg-white/5 p-4 rounded-lg hover:bg-white/10 transition">
+                            <span class="flex-1">Fazer Backup dos Dados</span>
+                            <span class="text-sm text-white/70">Exportar .json</span>
+                        </button>
+                        <button id="restoreBtn" class="w-full text-left flex items-center bg-white/5 p-4 rounded-lg hover:bg-white/10 transition">
+                            <span class="flex-1">Restaurar a partir de Backup</span>
+                             <span class="text-sm text-white/70">Importar .json</span>
+                        </button>
+                         <div class="pt-4 mt-4 border-t border-white/20">
+                             <h3 class="font-medium text-lg mb-4 text-red-400">Zona de Perigo</h3>
+                             <button id="clearDataBtn" class="w-full text-left flex items-center bg-red-500/10 p-4 rounded-lg hover:bg-red-500/20 transition text-red-400">
+                                  <span class="flex-1 font-semibold">Limpar Todos os Dados</span>
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                             </button>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="universalModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="glassmorphism border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <div class="modal-content-wrapper">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="modalTitle" class="text-lg font-semibold">Editar</h3>
+                    <button id="modalMaximizeBtn" class="p-2 -mr-2 rounded-full hover:bg-white/10 transition" title="Maximizar">
+                        <svg class="h-4 w-4" id="iconMaximize" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5" /></svg>
+                        <svg class="h-4 w-4 hidden" id="iconRestore" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5m0 0v5m0-5l5 5m9-9h5m0 0v-5m0 5l-5-5M5 10V5m0 0h5m-5 0l5 5m9 9v-5m0 0h-5m5 0l-5-5" /></svg>
+                    </button>
+                </div>
+                <textarea id="modalInput" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4" rows="8"></textarea>
+                <div class="flex justify-end space-x-2">
+                    <button id="modalCancel" class="px-4 py-2 rounded-lg hover:bg-white/10 transition">Cancelar</button>
+                    <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="logModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="glassmorphism border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <h3 id="logModalTitle" class="text-lg font-semibold mb-4">Registrar Atividade</h3>
+            <div class="mb-4">
+                <label class="block text-sm text-white/70 mb-1">Data</label>
+                <input type="date" id="logDate" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm text-white/70 mb-1">Hora</label>
+                <input type="time" id="logTime" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button id="logModalCancel" class="px-4 py-2 rounded-lg hover:bg-white/10 transition">Cancelar</button>
+                <button id="logModalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition">Registrar</button>
+            </div>
+            <div class="mt-6 pt-4 border-t border-white/10">
+                <h4 class="text-sm font-semibold text-white/70 mb-2">Registros do dia</h4>
+                <div id="dailyLogsList" class="space-y-2 max-h-32 overflow-y-auto">
+                   </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dataModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="glassmorphism border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <h3 id="dataModalTitle" class="text-lg font-semibold mb-4">Backup de Dados</h3>
+            <div id="backupContent" class="mb-4">
+                <p class="text-sm text-white/70 mb-2">Copie o texto abaixo para fazer backup dos seus dados:</p>
+                <textarea id="backupData" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2" rows="6" readonly></textarea>
+                <button id="copyBackupBtn" class="w-full py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition">Copiar para Área de Transferência</button>
+            </div>
+            <div id="restoreContent" class="mb-4 hidden">
+                <p class="text-sm text-white/70 mb-2">Cole seus dados de backup abaixo:</p>
+                <textarea id="restoreData" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2" rows="6"></textarea>
+                <button id="confirmRestoreBtn" class="w-full py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition">Restaurar Dados</button>
+            </div>
+            <div class="flex justify-end">
+                <button id="dataModalClose" class="px-4 py-2 rounded-lg hover:bg-white/10 transition">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="glassmorphism border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <h3 id="confirmModalTitle" class="text-lg font-semibold mb-4">Confirmação</h3>
+            <p id="confirmModalMessage" class="mb-6">Tem certeza que deseja realizar esta ação?</p>
+            <div class="flex justify-end space-x-2">
+                <button id="confirmModalCancel" class="px-4 py-2 rounded-lg hover:bg-white/10 transition">Cancelar</button>
+                <button id="confirmModalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Estado da aplicação (sem alterações)
+        const state = {
+            currentView: 'dashboard',
+            currentHabitId: null,
+            editingNoteId: null,
+            editingHabitId: null,
+            editingLogId: null,
+            selectedDateForLog: null,
+            calendarView: 'month',
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear(),
+            modalContext: null,
+            dataModalContext: null,
+            dataToRestore: null
+        };
+
+        // Inicialização (com verificação inicial da sidebar)
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setupEventListeners();
+            checkInitialSidebarState(); // NOVO: Verifica se a sidebar deve começar recolhida
+            updateUI();
+            startStreakCounter();
+        });
+
+        // Estrutura de dados (sem alterações)
+        let appData = {
+            habits: [],
+            generalNotes: [],
+            lastActivity: null,
+            isNotesFeedVisible: false
+        };
+
+        // Funções de dados (sem alterações)
+        function loadData() {
+            const savedData = localStorage.getItem('habitFlowData');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+                if (appData.isNotesFeedVisible === undefined) {
+                    appData.isNotesFeedVisible = false;
+                }
+            }
+        }
+        function persistData() {
+            localStorage.setItem('habitFlowData', JSON.stringify(appData));
+        }
+        function saveData() {
+            persistData();
+            updateUI();
+        }
+
+        // NOVO: Função para alternar a sidebar
+        function toggleSidebar() {
+            const container = document.getElementById('app-container');
+            const body = document.body; // Pega a referência do body
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            // Alterna a classe no container principal
+            container.classList.toggle('sidebar-collapsed');
+            
+            // NOVO: Alterna a classe de estado diretamente no body
+            body.classList.toggle('sidebar-is-collapsed');
+
+            // Lógica do overlay para mobile (permanece a mesma)
+            if (window.innerWidth <= 768) {
+                const isCollapsed = container.classList.contains('sidebar-collapsed');
+                overlay.classList.toggle('hidden', isCollapsed);
+            }
+        }
+        
+        // NOVO: Função para definir o estado inicial da sidebar em telas menores
+        function checkInitialSidebarState() {
+            if (window.innerWidth <= 768) {
+                document.getElementById('app-container').classList.add('sidebar-collapsed');
+                document.body.classList.add('sidebar-is-collapsed'); // NOVO: Adiciona a classe no body também
+                document.getElementById('sidebar-overlay').classList.add('hidden');
+            }
+        }
+
+        // Configuração de Event Listeners (adicionados listeners para os novos botões)
+        function setupEventListeners() {
+            // NOVO: Listeners para os botões da sidebar
+            document.getElementById('sidebar-toggle-internal').addEventListener('click', toggleSidebar);
+            document.getElementById('sidebar-toggle-external').addEventListener('click', toggleSidebar);
+            
+            // NOVO: Listener para o overlay da sidebar
+            document.getElementById('sidebar-overlay').addEventListener('click', toggleSidebar);
+
+            // Listeners existentes...
+            document.getElementById('logoTitle').addEventListener('click', () => showDashboard());
+            document.getElementById('dashboardLink').addEventListener('click', () => showDashboard());
+            document.getElementById('notesLink').addEventListener('click', () => showGeneralNotes());
+            document.getElementById('backToDashboard').addEventListener('click', () => showDashboard());
+            document.getElementById('backFromNotes').addEventListener('click', () => showDashboard());
+            document.getElementById('newHabitForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const habitName = document.getElementById('habitName').value.trim();
+                if (habitName) {
+                    addHabit(habitName);
+                    document.getElementById('habitName').value = '';
+                }
+            });
+            document.getElementById('monthViewBtn').addEventListener('click', () => {
+                state.calendarView = 'month';
+                updateCalendar();
+            });
+            document.getElementById('yearViewBtn').addEventListener('click', () => {
+                state.calendarView = 'year';
+                updateCalendar();
+            });
+            document.getElementById('modalCancel').addEventListener('click', () => {
+                document.getElementById('universalModal').classList.add('hidden');
+            });
+            document.getElementById('modalConfirm').addEventListener('click', () => {
+                handleModalConfirm();
+            });
+            document.getElementById('logModalCancel').addEventListener('click', () => {
+                document.getElementById('logModal').classList.add('hidden');
+            });
+            document.getElementById('logModalConfirm').addEventListener('click', () => {
+                handleLogModalConfirm();
+            });
+            document.getElementById('dataModalClose').addEventListener('click', () => {
+                document.getElementById('dataModal').classList.add('hidden');
+            });
+            document.getElementById('copyBackupBtn').addEventListener('click', () => {
+                copyToClipboard('backupData');
+            });
+            document.getElementById('confirmRestoreBtn').addEventListener('click', handleRestore);
+            document.getElementById('confirmModalCancel').addEventListener('click', () => {
+                document.getElementById('confirmModal').classList.add('hidden');
+            });
+            document.getElementById('confirmModalConfirm').addEventListener('click', () => {
+                handleConfirmModalConfirm();
+            });
+            document.getElementById('backupBtn').addEventListener('click', handleBackup);
+            document.getElementById('restoreBtn').addEventListener('click', handleRestore);
+            document.getElementById('clearDataBtn').addEventListener('click', () => {
+                showConfirmModal('Limpar todos os dados', 'Tem certeza que deseja apagar PERMANENTEMENTE todos os hábitos e anotações? Esta ação não pode ser desfeita.', 'clearData');
+            });
+            document.getElementById('generalNotesList').addEventListener('click', (e) => {
+                if (e.target.matches('.toggle-content-btn')) {
+                    const noteElement = e.target.closest('.general-note');
+                    const shortContent = noteElement.querySelector('.short-content');
+                    const fullContent = noteElement.querySelector('.full-content');
+                    noteElement.classList.toggle('is-expanded');
+                    if (noteElement.classList.contains('is-expanded')) {
+                        shortContent.classList.add('hidden');
+                        fullContent.classList.remove('hidden');
+                        e.target.textContent = 'Ver menos...';
+                    } else {
+                        shortContent.classList.remove('hidden');
+                        fullContent.classList.add('hidden');
+                        e.target.textContent = 'Ver mais...';
+                    }
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const modals = document.querySelectorAll('#universalModal, #logModal, #dataModal, #confirmModal');
+                    modals.forEach(modal => {
+                        if (!modal.classList.contains('hidden')) {
+                            modal.classList.add('hidden');
+                        }
+                    });
+                     document.querySelectorAll('.actions-dropdown').forEach(m => m.classList.add('hidden'));
+                }
+            });
+            document.getElementById('prevCalendarBtn').addEventListener('click', navigateCalendar.bind(null, -1));
+            document.getElementById('nextCalendarBtn').addEventListener('click', navigateCalendar.bind(null, 1));
+            document.getElementById('backFromSettings').addEventListener('click', () => showDashboard());
+            document.getElementById('settingsLink').addEventListener('click', () => showSettings());
+            document.getElementById('toggleNotesFeedBtn').addEventListener('click', () => {
+                appData.isNotesFeedVisible = !appData.isNotesFeedVisible;
+                persistData();
+                updateNotesFeedVisibility();
+            });
+            document.getElementById('notesFeedContent').addEventListener('click', (e) => {
+                const card = e.target.closest('[data-note-type]');
+                if (!card) return;
+
+                const type = card.getAttribute('data-note-type');
+                if (type === 'habit') {
+                    const habitId = card.getAttribute('data-habit-id');
+                    showHabitDetail(habitId);
+                } else if (type === 'general') {
+                    showGeneralNotes();
+                }
+            });
+            document.getElementById('modalMaximizeBtn').addEventListener('click', () => {
+                const modalContainer = document.querySelector('#universalModal > .glassmorphism');
+                const modalOverlay = document.getElementById('universalModal');
+                const btn = document.getElementById('modalMaximizeBtn');
+                const iconMaximize = document.getElementById('iconMaximize');
+                const iconRestore = document.getElementById('iconRestore');
+
+                modalContainer.classList.toggle('modal-maximized');
+
+                void modalContainer.offsetWidth;
+
+                if (modalContainer.classList.contains('modal-maximized')) {
+                    modalOverlay.classList.remove('items-center', 'justify-center');
+                    modalOverlay.style.overflow = 'visible';
+                    btn.style.right = '1.5rem';
+                    iconMaximize.classList.add('hidden');
+                    iconRestore.classList.remove('hidden');
+                } else {
+                    modalOverlay.classList.add('items-center', 'justify-center');
+                    modalOverlay.style.overflow = 'auto';
+                    btn.style.right = '';
+                    iconMaximize.classList.remove('hidden');
+                    iconRestore.classList.add('hidden');
+                }
+            });
+            const sidebarList = document.getElementById('sidebarHabitsList');
+            sidebarList.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-action]');
+                if (!target) return;
+
+                const action = target.getAttribute('data-action');
+                const habitId = target.getAttribute('data-habit-id');
+                
+                if (target.tagName === 'BUTTON') {
+                    e.stopPropagation();
+                }
+
+                switch (action) {
+                    case 'navigate':
+                        document.querySelectorAll('.actions-dropdown').forEach(m => m.classList.add('hidden'));
+                        showHabitDetail(habitId);
+                        break;
+                    case 'toggle-menu':
+                        const menu = target.nextElementSibling;
+                        const isHidden = menu.classList.contains('hidden');
+                        document.querySelectorAll('.actions-dropdown').forEach(m => {
+                            if (m !== menu) m.classList.add('hidden');
+                        });
+                        menu.classList.toggle('hidden');
+                        break;
+                    
+                    case 'edit':
+                        const habitNameToEdit = target.getAttribute('data-habit-name');
+                        showEditModal('Editar nome do hábito', habitNameToEdit, 'habitName', habitId);
+                        break;
+                    
+                    case 'delete':
+                        const habitNameToDelete = target.getAttribute('data-habit-name');
+                        showConfirmModal('Excluir Hábito', `Tem certeza que deseja excluir o hábito "${habitNameToDelete}"? Esta ação não pode ser desfeita.`, 'deleteHabit', habitId);
+                        break;
+                }
+            });
+            window.addEventListener('click', (e) => {
+                if (!e.target.closest('.relative.flex')) {
+                    document.querySelectorAll('.actions-dropdown').forEach(m => m.classList.add('hidden'));
+                }
+            });
+            
+            // NOVO: Listener para redimensionamento da janela
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768) {
+                    // Em telas pequenas, garante que o overlay esteja oculto se a sidebar estiver recolhida
+                    const container = document.getElementById('app-container');
+                    const overlay = document.getElementById('sidebar-overlay');
+                    if (container.classList.contains('sidebar-collapsed')) {
+                        overlay.classList.add('hidden');
+                    }
+                }
+            });
+        }
+        
+        /* Resto do seu JavaScript (sem alterações) */
+        // ... (todo o restante do seu script a partir daqui)
+        // Funções de navegação
+        function showDashboard() {
+            state.currentView = 'dashboard';
+            updateUI();
+        }
+    
+        function showHabitDetail(habitId) {
+            state.currentView = 'habitDetail';
+            state.currentHabitId = habitId;
+            updateUI();
+        }
+    
+        function showGeneralNotes() {
+            state.currentView = 'generalNotes';
+            updateUI();
+        }
+    
+        function showSettings() {
+            state.currentView = 'settings';
+            updateUI();
+        }
+    
+        // Funções de atualização da UI
+        function updateUI() {
+            document.getElementById('dashboardView').classList.add('hidden');
+            document.getElementById('habitDetailView').classList.add('hidden');
+            document.getElementById('generalNotesView').classList.add('hidden');
+            document.getElementById('settingsView').classList.add('hidden');
+            renderSidebarHabitsList();
+            if (state.currentView === 'dashboard') {
+                document.getElementById('dashboardView').classList.remove('hidden');
+                renderHabits();
+            } else if (state.currentView === 'habitDetail') {
+                document.getElementById('habitDetailView').classList.remove('hidden');
+                renderHabitDetail();
+            } else if (state.currentView === 'generalNotes') {
+                document.getElementById('generalNotesView').classList.remove('hidden');
+                renderGeneralNotes();
+            } else if (state.currentView === 'settings') {
+                document.getElementById('settingsView').classList.remove('hidden');
+            }
+        }
+        
+        function renderHabits() {
+            const container = document.getElementById('habitsContainer');
+            container.innerHTML = '';
+    
+            if (appData.habits.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-white/40 col-span-full">Nenhum hábito cadastrado. Adicione um na barra lateral.</div>';
+            } else {
+                appData.habits.forEach(habit => {
+                    const habitCard = document.createElement('div');
+                    habitCard.className = 'glassmorphism border border-white/10 rounded-2xl p-4 habit-card flex flex-col cursor-pointer';
+                    habitCard.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h3 class="font-medium truncate-text pr-2">${escapeHTML(habit.name)}</h3>
+                            <div class="streak-counter text-xs bg-white/5 px-2 py-1 rounded-full whitespace-nowrap" data-habit-id="${habit.id}">
+                                ---
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-white/60">
+                            ${habit.logs && habit.logs.length > 0 ? `${habit.logs.length} registros` : 'Nenhum registro'}
+                        </div>
+                        <div class="mini-calendar-container mt-4 flex-grow"></div>
+                    `;
+                    habitCard.addEventListener('click', () => showHabitDetail(habit.id));
+                    const miniCalContainer = habitCard.querySelector('.mini-calendar-container');
+                    renderMiniCalendar(habit, miniCalContainer);
+                    container.appendChild(habitCard);
+                });
+            }
+            
+            updateStreakCounter();
+            updateNotesFeedVisibility();
+        }
+    
+        function renderHabitDetail() {
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit) {
+                showDashboard();
+                return;
+            }
+    
+            document.getElementById('habitNameTitle').textContent = habit.name;
+            document.getElementById('editHabitName').onclick = () => {
+                showEditModal('Editar nome do hábito', habit.name, 'habitName', habit.id);
+            };
+
+            document.getElementById('deleteHabitBtn').onclick = () => {
+                showConfirmModal('Excluir Hábito', `Tem certeza que deseja excluir o hábito "${escapeHTML(habit.name)}" e todos os seus dados? Esta ação não pode ser desfeita.`, 'deleteHabit', state.currentHabitId);
+            };
+    
+            const habitDetailCounter = document.getElementById('habitDetailStreakCounter');
+            if (habitDetailCounter) {
+                habitDetailCounter.setAttribute('data-habit-id', habit.id);
+            }
+    
+            updateCalendar();
+            renderRecentLogs();
+            renderHabitNotes();
+    
+            document.getElementById('addNoteBtn').onclick = () => {
+                showEditModal('Nova anotação', '', 'habitNote');
+            };
+        }
+    
+        function updateCalendar() {
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const titleEl = document.getElementById('calendarTitle');
+            if (state.calendarView === 'month') {
+                titleEl.textContent = `${monthNames[state.currentMonth]} ${state.currentYear}`;
+                document.getElementById('monthCalendar').classList.remove('hidden');
+                document.getElementById('yearCalendar').classList.add('hidden');
+                document.getElementById('monthViewBtn').classList.add('bg-blue-500');
+                document.getElementById('monthViewBtn').classList.remove('bg-white/5');
+                document.getElementById('yearViewBtn').classList.remove('bg-blue-500');
+                document.getElementById('yearViewBtn').classList.add('bg-white/5');
+                renderMonthCalendar();
+            } else {
+                titleEl.textContent = state.currentYear;
+                document.getElementById('monthCalendar').classList.add('hidden');
+                document.getElementById('yearCalendar').classList.remove('hidden');
+                document.getElementById('monthViewBtn').classList.remove('bg-blue-500');
+                document.getElementById('monthViewBtn').classList.add('bg-white/5');
+                document.getElementById('yearViewBtn').classList.add('bg-blue-500');
+                document.getElementById('yearViewBtn').classList.remove('bg-white/5');
+                renderYearCalendar();
+            }
+        }
+        
+        function renderMiniCalendar(habit, container) {
+            container.innerHTML = '';
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const title = document.createElement('h5');
+            title.className = 'text-xs text-white/70 mb-2 text-center font-semibold';
+            title.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            container.appendChild(title);
+            const daysHeader = document.createElement('div');
+            daysHeader.className = 'grid grid-cols-7 gap-1 text-xs text-center text-white/50 mb-1';
+            ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(name => {
+                const dayNameEl = document.createElement('div');
+                dayNameEl.textContent = name;
+                daysHeader.appendChild(dayNameEl);
+            });
+            container.appendChild(daysHeader);
+            const daysContainer = document.createElement('div');
+            daysContainer.className = 'grid grid-cols-7 gap-1';
+            const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                daysContainer.appendChild(document.createElement('div'));
+            }
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                const currentDate = new Date(currentYear, currentMonth, day);
+                currentDate.setHours(0,0,0,0);
+                dayCell.className = 'h-6 w-6 flex items-center justify-center rounded-full text-xs';
+                const hasLog = habit.logs && habit.logs.some(log => log.date.startsWith(formatDate(currentDate)));
+                if (hasLog) {
+                    dayCell.classList.add('bg-blue-500/50');
+                }
+                if (currentDate.getTime() === today.setHours(0,0,0,0)) {
+                    dayCell.classList.add('is-today');
+                }
+                dayCell.textContent = day;
+                daysContainer.appendChild(dayCell);
+            }
+            container.appendChild(daysContainer);
+        }
+    
+        function renderMonthCalendar() {
+            const monthDaysContainer = document.getElementById('monthDays');
+            monthDaysContainer.innerHTML = '';
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit) return;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+    
+            const firstDay = new Date(state.currentYear, state.currentMonth, 1);
+            const daysInMonth = new Date(state.currentYear, state.currentMonth + 1, 0).getDate();
+            const startingDay = firstDay.getDay();
+    
+            for (let i = 0; i < startingDay; i++) monthDaysContainer.appendChild(document.createElement('div'));
+    
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(state.currentYear, state.currentMonth, day);
+                const dayElement = document.createElement('div');
+                dayElement.className = 'h-8 flex items-center justify-center rounded-full cursor-pointer hover:bg-white/10 transition';
+                
+                if (habit.logs && habit.logs.some(log => log.date.startsWith(formatDate(date)))) {
+                    dayElement.classList.add('bg-blue-500/30');
+                }
+                
+                if (date.getTime() === today.getTime()) {
+                    dayElement.classList.add('is-today');
+                }
+                
+                dayElement.textContent = day;
+                dayElement.addEventListener('click', () => showLogModal(date));
+                monthDaysContainer.appendChild(dayElement);
+            }
+        }
+    
+        function renderYearCalendar() {
+            const yearContainer = document.getElementById('yearCalendar');
+            yearContainer.innerHTML = '';
+            yearContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit) return;
+    
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const dayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+    
+            for (let month = 0; month < 12; month++) {
+                const monthWrapper = document.createElement('div');
+                monthWrapper.className = 'glassmorphism border border-white/10 rounded-xl p-3 text-sm';
+    
+                const monthTitle = document.createElement('h4');
+                monthTitle.className = 'font-semibold text-center mb-2 cursor-pointer hover:text-blue-400';
+                monthTitle.textContent = monthNames[month];
+                monthTitle.onclick = () => {
+                    state.currentMonth = month;
+                    state.calendarView = 'month';
+                    updateCalendar();
+                };
+                monthWrapper.appendChild(monthTitle);
+    
+                const daysHeader = document.createElement('div');
+                daysHeader.className = 'grid grid-cols-7 gap-1 text-xs text-center text-white/50 mb-1';
+                dayNames.forEach(name => {
+                    const dayNameEl = document.createElement('div');
+                    dayNameEl.textContent = name;
+                    daysHeader.appendChild(dayNameEl);
+                });
+                monthWrapper.appendChild(daysHeader);
+    
+                const daysContainer = document.createElement('div');
+                daysContainer.className = 'grid grid-cols-7 gap-1';
+                const firstDayOfMonth = new Date(state.currentYear, month, 1).getDay();
+                const daysInMonth = new Date(state.currentYear, month + 1, 0).getDate();
+    
+                for (let i = 0; i < firstDayOfMonth; i++) daysContainer.appendChild(document.createElement('div'));
+    
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'h-6 w-6 flex items-center justify-center rounded-full hover:bg-white/10 transition cursor-pointer';
+                    dayCell.textContent = day;
+                    const currentDate = new Date(state.currentYear, month, day);
+    
+                    if (habit.logs && habit.logs.some(log => log.date.startsWith(formatDate(currentDate)))) {
+                        dayCell.classList.add('bg-blue-500/50', 'border', 'border-blue-400');
+                    }
+                    if (currentDate.getTime() === today.getTime()) {
+                        dayCell.classList.add('is-today');
+                    }
+    
+                    dayCell.onclick = () => showLogModal(currentDate);
+                    daysContainer.appendChild(dayCell);
+                }
+                monthWrapper.appendChild(daysContainer);
+                yearContainer.appendChild(monthWrapper);
+            }
+        }
+    
+        function renderRecentLogs() {
+            const container = document.getElementById('recentLogs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit || !habit.logs || habit.logs.length === 0) {
+                container.innerHTML = '<p class="text-sm text-white/40 text-center py-4">Nenhum registro encontrado</p>';
+                return;
+            }
+
+            const sortedLogs = [...habit.logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+            sortedLogs.slice(0, 10).forEach(log => {
+                const logElement = document.createElement('div');
+                logElement.className = 'glassmorphism border border-white/10 rounded-lg p-3 flex justify-between items-center hover:bg-white/5 transition';
+                
+                const logDate = new Date(log.date);
+                const dateStr = logDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+                const timeStr = logDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                
+                logElement.innerHTML = `
+                    <div class="flex-grow cursor-pointer">
+                        <span class="text-sm">${dateStr}</span>
+                        <span class="text-xs text-white/60 ml-2">${timeStr}</span>
+                    </div>
+                    <button class="delete-log-btn text-xs hover:text-red-400 transition ml-4 p-1" title="Excluir Registro Imediatamente">Excluir</button>
+                `;
+
+                logElement.querySelector('.flex-grow').addEventListener('click', () => {
+                    showLogModal(new Date(log.date));
+                });
+                
+                const deleteBtn = logElement.querySelector('.delete-log-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    deleteLog(state.currentHabitId, log.id);
+                });
+
+                container.appendChild(logElement);
+            });
+        }
+    
+        function renderHabitNotes() {
+            const container = document.getElementById('habitNotes');
+            if (!container) return;
+            container.innerHTML = '';
+    
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit || !habit.notes || habit.notes.length === 0) {
+                container.innerHTML = '<p class="text-sm text-white/40 text-center py-4">Nenhuma anotação.</p>';
+                return;
+            }
+            const sortedNotes = [...habit.notes].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            sortedNotes.forEach(note => {
+                const noteElement = document.createElement('div');
+                noteElement.className = 'glassmorphism border border-white/10 rounded-lg p-3';
+                noteElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs text-white/60">${new Date(note.createdAt).toLocaleDateString('pt-BR')}</span>
+                        <div class="flex space-x-2">
+                            <button class="text-xs hover:text-blue-400 transition" data-note-id="${note.id}" data-action="edit">Editar</button>
+                            <button class="text-xs hover:text-red-400 transition" data-note-id="${note.id}" data-action="delete">Excluir</button>
+                        </div>
+                    </div>
+                    <p class="text-sm whitespace-pre-line break-word">${escapeHTML(note.content)}</p>
+                `;
+                noteElement.querySelector('[data-action="edit"]').addEventListener('click', () => {
+                    showEditModal('Editar anotação', note.content, 'habitNote', note.id);
+                });
+                noteElement.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    showConfirmModal('Excluir anotação', 'Tem certeza?', 'deleteHabitNote', note.id);
+                });
+                container.appendChild(noteElement);
+            });
+        }
+        
+        function renderGeneralNotes() {
+            const container = document.getElementById('generalNotesList');
+            container.innerHTML = '';
+            document.getElementById('addGeneralNoteBtn').onclick = () => {
+                showEditModal('Nova anotação geral', '', 'generalNote');
+            };
+            if (appData.generalNotes.length === 0) {
+                container.innerHTML = '<p class="text-sm text-white/40 text-center py-4">Nenhuma anotação encontrada</p>';
+                return;
+            }
+            const sortedNotes = [...appData.generalNotes].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            sortedNotes.forEach(note => {
+                const noteElement = document.createElement('div');
+                noteElement.className = 'general-note glassmorphism border border-white/10 rounded-lg p-3 mb-3';
+                const noteDate = new Date(note.createdAt).toLocaleDateString('pt-BR');
+                const characterLimit = 250;
+                
+                const escapedContent = escapeHTML(note.content);
+                let contentHTML = '';
+                if (note.content.length > characterLimit) {
+                    contentHTML = `
+                        <div class="short-content">
+                            <p class="text-sm whitespace-pre-line break-word">${escapedContent.substring(0, characterLimit)}...</p>
+                        </div>
+                        <div class="full-content hidden">
+                            <p class="text-sm whitespace-pre-line break-word">${escapedContent}</p>
+                        </div>
+                        <button class="toggle-content-btn text-xs text-blue-400 hover:underline mt-2">Ver mais...</button>
+                    `;
+                } else {
+                    contentHTML = `<p class="text-sm whitespace-pre-line break-word">${escapedContent}</p>`;
+                }
+    
+                noteElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs text-white/60">${noteDate}</span>
+                        <div class="flex space-x-2">
+                             <button class="text-xs hover:text-blue-400 transition" onclick="showEditModal('Editar anotação geral', \`${note.content.replace(/`/g, '\\`')}\`, 'generalNote', '${note.id}')">Editar</button>
+                            <button class="text-xs hover:text-red-400 transition" onclick="showConfirmModal('Excluir anotação geral', 'Tem certeza?', 'deleteGeneralNote', '${note.id}')">Excluir</button>
+                        </div>
+                    </div>
+                    ${contentHTML}
+                `;
+                container.appendChild(noteElement);
+            });
+        }
+    
+        // Funções de CRUD
+        function addHabit(name) {
+            const newHabit = { id: generateId(), name: name, createdAt: new Date().toISOString(), logs: [], notes: [] };
+            appData.habits.push(newHabit);
+            saveData();
+            document.getElementById('habitName').focus();
+        }
+    
+        function updateHabitName(habitId, newName) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (habit) { habit.name = newName; saveData(); }
+        }
+    
+        function deleteHabit(habitId) {
+            appData.habits = appData.habits.filter(h => h.id !== habitId);
+            if (state.currentHabitId === habitId) state.currentView = 'dashboard';
+            saveData();
+        }
+    
+        function addLog(habitId, dateTime, logId = null) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (!habit) return;
+            if (logId) {
+                const logIndex = habit.logs.findIndex(l => l.id === logId);
+                if (logIndex !== -1) habit.logs[logIndex].date = dateTime.toISOString();
+            } else {
+                habit.logs.push({ id: generateId(), date: dateTime.toISOString() });
+            }
+            appData.lastActivity = new Date().toISOString();
+            saveData();
+        }
+    
+        function deleteLog(habitId, logId) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (habit) {
+                habit.logs = habit.logs.filter(l => l.id !== logId);
+                saveData();
+                if (!document.getElementById('logModal').classList.contains('hidden')) {
+                    renderDailyLogs(state.selectedDateForLog);
+                }
+            }
+        }
+        
+        function addHabitNote(habitId, content, noteId = null) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (!habit) return;
+            if (noteId) {
+                const note = habit.notes.find(n => n.id === noteId);
+                if (note) { note.content = content; note.updatedAt = new Date().toISOString(); }
+            } else {
+                habit.notes.push({ id: generateId(), content: content, createdAt: new Date().toISOString() });
+            }
+            saveData();
+        }
+    
+        function deleteHabitNote(habitId, noteId) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (habit) { habit.notes = habit.notes.filter(n => n.id !== noteId); saveData(); }
+        }
+    
+        function addGeneralNote(content, noteId = null) {
+            if (noteId) {
+                const note = appData.generalNotes.find(n => n.id === noteId);
+                if (note) { note.content = content; note.updatedAt = new Date().toISOString(); }
+            } else {
+                appData.generalNotes.push({ id: generateId(), content: content, createdAt: new Date().toISOString() });
+            }
+            saveData();
+        }
+    
+        function deleteGeneralNote(noteId) {
+            appData.generalNotes = appData.generalNotes.filter(n => n.id !== noteId);
+            saveData();
+        }
+    
+        function showEditModal(title, initialValue, context, itemId = null) {
+            state.modalContext = context;
+            state.editingNoteId = null;
+            state.editingHabitId = null;
+
+            if (context === 'habitNote' || context === 'generalNote') {
+                state.editingNoteId = itemId;
+            } else if (context === 'habitName') {
+                state.editingHabitId = itemId; // Armazena o ID do hábito a ser editado
+            }
+
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalInput').value = initialValue;
+            document.getElementById('universalModal').classList.remove('hidden');
+            document.getElementById('modalInput').focus();
+        }
+
+        function handleModalConfirm() {
+            const newValue = document.getElementById('modalInput').value;
+            // Modificado para usar o ID do hábito do estado, permitindo a edição pela sidebar
+            if (state.modalContext === 'habitName' && state.editingHabitId && newValue.trim()) {
+                updateHabitName(state.editingHabitId, newValue.trim());
+            } else if (state.modalContext === 'habitNote' && state.currentHabitId) {
+                addHabitNote(state.currentHabitId, newValue, state.editingNoteId);
+            } else if (state.modalContext === 'generalNote') {
+                addGeneralNote(newValue, state.editingNoteId);
+            }
+            document.getElementById('universalModal').classList.add('hidden');
+        }
+    
+        function showLogModal(date) {
+            state.selectedDateForLog = date;
+            state.editingLogId = null;
+            
+            document.getElementById('logModalTitle').textContent = 'Registrar Atividade';
+            document.getElementById('logModalConfirm').textContent = 'Registrar';
+            
+            const dateStr = date.toISOString().split('T')[0];
+            document.getElementById('logDate').value = dateStr;
+            
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('logTime').value = `${hours}:${minutes}`;
+
+            renderDailyLogs(date);
+            
+            document.getElementById('logModal').classList.remove('hidden');
+            document.getElementById('logTime').focus();
+        }
+        
+        function renderDailyLogs(date) {
+            const container = document.getElementById('dailyLogsList');
+            container.innerHTML = '';
+            const habit = appData.habits.find(h => h.id === state.currentHabitId);
+            if (!habit) return;
+
+            const dateStr = formatDate(date);
+            const dailyLogs = habit.logs
+                .filter(log => log.date.startsWith(dateStr))
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (dailyLogs.length === 0) {
+                container.innerHTML = `<p class="text-sm text-white/40 text-center py-2">Nenhum registro para este dia.</p>`;
+                return;
+            }
+
+            dailyLogs.forEach(log => {
+                const logEl = document.createElement('div');
+                logEl.className = 'flex justify-between items-center bg-white/5 p-2 rounded-lg';
+                const timeStr = new Date(log.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                logEl.innerHTML = `
+                    <span class="text-sm">${timeStr}</span>
+                    <div class="flex space-x-2">
+                        <button class="text-xs p-1 rounded hover:bg-white/10" data-log-id="${log.id}" data-action="edit">Editar</button>
+                        <button class="text-xs p-1 rounded hover:bg-red-500/20 text-red-400" data-log-id="${log.id}" data-action="delete">Excluir</button>
+                    </div>
+                `;
+                logEl.querySelector('[data-action="edit"]').addEventListener('click', () => {
+                    state.editingLogId = log.id;
+                    const logDate = new Date(log.date);
+                    document.getElementById('logTime').value = logDate.toTimeString().substring(0, 5);
+                    document.getElementById('logModalTitle').textContent = 'Editar Registro';
+                    document.getElementById('logModalConfirm').textContent = 'Atualizar';
+                    document.getElementById('logTime').focus();
+                });
+                logEl.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                    showConfirmModal('Excluir Registro', `Tem certeza que deseja excluir o registro das ${timeStr}?`, 'deleteLog', log.id);
+                });
+                container.appendChild(logEl);
+            });
+        }
+    
+        function handleLogModalConfirm() {
+            const dateStr = document.getElementById('logDate').value;
+            const timeStr = document.getElementById('logTime').value;
+            if (!dateStr || !timeStr) return;
+            const dateTime = new Date(`${dateStr}T${timeStr}`);
+            if (state.currentHabitId) {
+                addLog(state.currentHabitId, dateTime, state.editingLogId);
+            }
+            
+            state.editingLogId = null;
+            document.getElementById('logModalTitle').textContent = 'Registrar Atividade';
+            document.getElementById('logModalConfirm').textContent = 'Registrar';
+            const now = new Date();
+            document.getElementById('logTime').value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            renderDailyLogs(state.selectedDateForLog);
+        }
+    
+        function showConfirmModal(title, message, action, itemId = null) {
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').textContent = message;
+            document.getElementById('confirmModal').setAttribute('data-action', action);
+            document.getElementById('confirmModal').setAttribute('data-item-id', itemId || '');
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+    
+        function handleConfirmModalConfirm() {
+            const action = document.getElementById('confirmModal').getAttribute('data-action');
+            const itemId = document.getElementById('confirmModal').getAttribute('data-item-id');
+            let shouldReload = false;
+    
+            if (action === 'deleteLog' && state.currentHabitId && itemId) {
+                deleteLog(state.currentHabitId, itemId);
+            } else if (action === 'deleteHabit' && itemId) { 
+                deleteHabit(itemId);
+            } else if (action === 'deleteHabitNote' && state.currentHabitId && itemId) {
+                deleteHabitNote(state.currentHabitId, itemId);
+            } else if (action === 'deleteGeneralNote' && itemId) {
+                deleteGeneralNote(itemId);
+            } else if (action === 'clearData') {
+                clearAllData();
+                shouldReload = true;
+            } else if (action === 'restoreData' && state.dataToRestore) {
+                appData = state.dataToRestore;
+                state.dataToRestore = null;
+                persistData();
+                shouldReload = true;
+            }
+    
+            document.getElementById('confirmModal').classList.add('hidden');
+            if (shouldReload) {
+                setTimeout(() => location.reload(), 50);
+            } else {
+                updateUI();
+            }
+        }
+    
+        // Funções de Backup/Restore
+        function handleBackup() {
+            try {
+                const dataStr = JSON.stringify(appData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `habitflow-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Erro ao criar backup:", error);
+                alert("Não foi possível criar o arquivo de backup.");
+            }
+        }
+    
+        function handleRestore() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const restoredData = JSON.parse(event.target.result);
+                        if (restoredData && Array.isArray(restoredData.habits)) {
+                            if (!restoredData.generalNotes) restoredData.generalNotes = [];
+                            if (!restoredData.lastActivity) restoredData.lastActivity = null;
+                            state.dataToRestore = restoredData;
+                            showConfirmModal('Restaurar Dados', 'Isso substituirá todos os seus dados atuais. Deseja continuar?', 'restoreData');
+                        } else {
+                            alert('Arquivo de backup inválido.');
+                        }
+                    } catch (error) {
+                        alert('Erro ao ler o arquivo de backup.');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        function clearAllData() {
+            localStorage.removeItem('habitFlowData');
+            appData = { habits: [], generalNotes: [], lastActivity: null };
+        }
+    
+        // Funções de utilidade
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        }
+    
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+    
+        function formatStreak(duration) {
+            if (!duration || duration <= 0) return '---';
+            const totalSeconds = Math.floor(duration / 1000);
+            const days = Math.floor(totalSeconds / 86400);
+            const hours = Math.floor((totalSeconds % 86400) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+        }
+    
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            element.select();
+            document.execCommand('copy');
+            const btn = document.getElementById('copyBackupBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Copiado!';
+            setTimeout(() => { btn.textContent = originalText; }, 2000);
+        }
+    
+        // Funções de sequência (Streak)
+        function calculateHabitStreak(habitId) {
+            const habit = appData.habits.find(h => h.id === habitId);
+            if (!habit || !habit.logs || habit.logs.length === 0) return null;
+            const sortedLogs = habit.logs.map(l => new Date(l.date)).sort((a, b) => b - a);
+            const now = new Date();
+            const twoDays = 48 * 60 * 60 * 1000;
+            if (now - sortedLogs[0] > twoDays) {
+                return null;
+            }
+            let streakStartDate = sortedLogs[0];
+            for (let i = 0; i < sortedLogs.length - 1; i++) {
+                const diff = sortedLogs[i] - sortedLogs[i+1];
+                if (diff > twoDays) {
+                    break;
+                }
+                streakStartDate = sortedLogs[i+1];
+            }
+            return streakStartDate;
+        }
+    
+        function renderSidebarHabitsList() {
+            const container = document.getElementById('sidebarHabitsList');
+            container.innerHTML = '';
+            if (!appData.habits || appData.habits.length === 0) {
+                container.innerHTML = '<p class="px-2 text-xs text-white/40">Nenhum hábito.</p>';
+                return;
+            }
+            const sortedHabits = [...appData.habits].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            sortedHabits.forEach(habit => {
+                const habitEntry = document.createElement('div');
+                habitEntry.className = 'relative flex items-center justify-between rounded-lg hover:bg-white/10 group transition-colors duration-150 cursor-pointer';
+                habitEntry.setAttribute('data-action', 'navigate');
+                habitEntry.setAttribute('data-habit-id', habit.id);
+
+                const habitNameSpan = document.createElement('span');
+                habitNameSpan.className = 'flex-grow p-2 text-sm truncate-text';
+                habitNameSpan.textContent = escapeHTML(habit.name);
+
+                if (state.currentView === 'habitDetail' && state.currentHabitId === habit.id) {
+                    habitNameSpan.classList.add('text-white');
+                    habitEntry.classList.add('bg-white/10');
+                    habitEntry.classList.remove('hover:bg-white/10');
+                } else {
+                    habitNameSpan.classList.add('text-white/70');
+                }
+
+                const actionsBtn = document.createElement('button');
+                actionsBtn.className = 'flex-shrink-0 p-2 mr-1 rounded-full hover:bg-white/20 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200';
+                actionsBtn.setAttribute('data-action', 'toggle-menu');
+                actionsBtn.setAttribute('data-habit-id', habit.id);
+                actionsBtn.setAttribute('aria-label', `Ações para ${escapeHTML(habit.name)}`);
+                actionsBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white/70 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01" /></svg>`;
+
+                const dropdownMenu = document.createElement('div');
+                dropdownMenu.className = 'actions-dropdown hidden w-40 rounded-lg shadow-lg';
+                const escapedHabitName = escapeHTML(habit.name);
+                dropdownMenu.innerHTML = `
+                    <button class="block w-full text-left px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-t-lg" data-action="edit" data-habit-id="${habit.id}" data-habit-name="${escapedHabitName}">Editar nome</button>
+                    <button class="block w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-white/10 rounded-b-lg" data-action="delete" data-habit-id="${habit.id}" data-habit-name="${escapedHabitName}">Excluir hábito</button>
+                `;
+
+                habitEntry.appendChild(habitNameSpan);
+                habitEntry.appendChild(actionsBtn);
+                habitEntry.appendChild(dropdownMenu);
+                container.appendChild(habitEntry);
+            });
+        }
+    
+        function updateStreakCounter() {
+            const habitCounters = document.querySelectorAll('.streak-counter');
+            habitCounters.forEach(counter => {
+                const habitId = counter.getAttribute('data-habit-id');
+                const streakStartDate = calculateHabitStreak(habitId);
+                if (streakStartDate) {
+                    const now = new Date();
+                    const duration = now - streakStartDate;
+                    counter.textContent = formatStreak(duration);
+                } else {
+                    counter.textContent = '0d 0h 0m 0s';
+                }
+            });
+        }
+        
+        function startStreakCounter() {
+            updateStreakCounter();
+            setInterval(updateStreakCounter, 1000);
+        }
+    
+        function navigateCalendar(direction) {
+            if (state.calendarView === 'month') {
+                state.currentMonth += direction;
+                if (state.currentMonth < 0) {
+                    state.currentMonth = 11;
+                    state.currentYear--;
+                } else if (state.currentMonth > 11) {
+                    state.currentMonth = 0;
+                    state.currentYear++;
+                }
+            } else {
+                state.currentYear += direction;
+            }
+            updateCalendar();
+        }
+    
+        function renderNotesFeed() {
+            const container = document.getElementById('notesFeedContent');
+            container.innerHTML = '';
+            
+            let allNotes = [];
+    
+            appData.generalNotes.forEach(note => {
+                allNotes.push({ ...note, type: 'general' });
+            });
+    
+            appData.habits.forEach(habit => {
+                if (habit.notes) {
+                    habit.notes.forEach(note => {
+                        allNotes.push({ ...note, type: 'habit', habitName: habit.name, habitId: habit.id });
+                    });
+                }
+            });
+    
+            allNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+            if (allNotes.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-white/40 col-span-full">Nenhuma anotação encontrada.</div>';
+                return;
+            }
+    
+            allNotes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = 'glassmorphism border border-white/10 rounded-xl p-4 cursor-pointer hover:border-white/20 transition';
+                noteCard.setAttribute('data-note-type', note.type);
+                if (note.type === 'habit') {
+                    noteCard.setAttribute('data-habit-id', note.habitId);
+                }
+    
+                const noteDate = new Date(note.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+                
+                let headerHTML = `<span class="text-xs text-white/60">${noteDate}</span>`;
+                if (note.type === 'habit') {
+                    headerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-white/60">${noteDate}</span>
+                            <span class="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">Do hábito: ${escapeHTML(note.habitName)}</span>
+                        </div>
+                    `;
+                }
+    
+                noteCard.innerHTML = `
+                    <div class="mb-2">${headerHTML}</div>
+                    <p class="text-sm whitespace-pre-line break-word">${escapeHTML(note.content)}</p>
+                `;
+                container.appendChild(noteCard);
+            });
+        }
+    
+        function updateNotesFeedVisibility() {
+            const container = document.getElementById('notesFeedContainer');
+            const toggleBtn = document.getElementById('toggleNotesFeedBtn');
+            if (appData.isNotesFeedVisible) {
+                renderNotesFeed();
+                container.classList.remove('hidden');
+                toggleBtn.classList.add('bg-blue-500/20');
+            } else {
+                container.classList.add('hidden');
+                toggleBtn.classList.remove('bg-blue-500/20');
+            }
+        }
+    
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(match) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[match];
+            });
+        }
+        
+    </script>
+</body>
+</html>
